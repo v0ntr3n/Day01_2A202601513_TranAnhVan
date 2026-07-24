@@ -17,6 +17,7 @@ import time
 from typing import Any, Callable
 
 from dotenv import load_dotenv
+from httpx import Client
 
 # Nạp OPENAI_API_KEY từ file .env (copy .env.example thành .env và dán key vào)
 load_dotenv()
@@ -69,7 +70,24 @@ def call_openai(
     """
     # TODO: import OpenAI, tạo client, gọi chat.completions.create,
     #       đo start/end time, trả về (response_text, latency)
-    raise NotImplementedError("Implement call_openai")
+    from openai import OpenAI
+    client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'), base_url=os.getenv('OPENAI_BASE_URL'))
+
+    start_time = time.time()
+    response = client.chat.completions.create(
+        model=model,
+        messages=[
+            # {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": prompt}
+        ],
+        temperature=temperature,
+        top_p=top_p,
+        max_tokens=max_tokens,
+        stream=False
+    )
+    end_time = time.time() - start_time
+    return (response.choices[0].message.content, end_time)
+    # raise NotImplementedError("Implement call_openai")
 
 
 # ---------------------------------------------------------------------------
@@ -91,7 +109,8 @@ def call_openai_mini(
         Tái sử dụng call_openai() với model=OPENAI_MINI_MODEL — 1 dòng code.
     """
     # TODO: gọi call_openai với model=OPENAI_MINI_MODEL
-    raise NotImplementedError("Implement call_openai_mini")
+    # raise NotImplementedError("Implement call_openai_mini")
+    return call_openai(prompt,OPENAI_MINI_MODEL,temperature, top_p, max_tokens)
 
 
 # ---------------------------------------------------------------------------
@@ -115,8 +134,16 @@ def compare_models(prompt: str) -> dict:
         (0.75 từ ≈ 1 token — ước lượng thô; Part 2 sẽ tính chính xác hơn)
     """
     # TODO: gọi call_openai và call_openai_mini, ghép dict kết quả
-    raise NotImplementedError("Implement compare_models")
+    # raise NotImplementedError("Implement compare_models")
+    gpt4o_response, gpt4o_latency = call_openai(prompt)
+    mini_response, mini_latency = call_openai_mini(prompt)
+    gpt4o_cost_estimate: float = (len(gpt4o_response.split()) / 0.75) / 1000 * PRICING_PER_1K_TOKENS["gpt-4o"]["output"]
 
+    return {"gpt4o_response": gpt4o_response,
+            "mini_response": mini_response,
+            "gpt4o_latency": gpt4o_latency,
+            "mini_latency": mini_latency,
+            "gpt4o_cost_estimate": gpt4o_cost_estimate}
 
 # ===========================================================================
 # PART 2 — SYSTEM PROMPT & TOKEN (Block 2: 10h40–11h20)
