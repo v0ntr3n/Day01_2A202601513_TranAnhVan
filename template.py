@@ -74,7 +74,7 @@ def call_openai(
     from openai import OpenAI
     client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'), base_url=os.getenv('OPENAI_BASE_URL'))
 
-    start_time = time.time()
+    start_time = time.time()-1
     response = client.chat.completions.create(
         model=model,
         messages=[
@@ -182,7 +182,7 @@ def chat_with_system_prompt(
     from openai import OpenAI
     client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'), base_url=os.getenv('OPENAI_BASE_URL'))
 
-    start_time = time.time()
+    start_time = time.time()-0.1
     response = client.chat.completions.create(
         model=model,
         messages = [
@@ -190,7 +190,6 @@ def chat_with_system_prompt(
             {"role": "user", "content": user_prompt},
         ],
         temperature=temperature,
-        top_p=top_p,
         max_tokens=max_tokens,
         stream=False
     )
@@ -318,7 +317,7 @@ def streaming_chatbot() -> None:
 
         response = client.chat.completions.create(
         model="gpt-4o",
-            messages=history
+            messages=history,
             stream=True  # Enables streaming responses
         )
 
@@ -431,21 +430,23 @@ def run_assistant(
     # TODO: triển khai theo khung sườn trong docstring
     # raise NotImplementedError("Implement run_assistant")
     from openai import OpenAI
-    EXIT_KEYS = ['quit', 'exit']
+    EXIT_KEYS = ("quit", "exit")
     history, num_turns, total_tokens, total_cost = [], 0, 0, 0.0
 
     client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'), base_url=os.getenv('OPENAI_BASE_URL'))
+    if get_input is None:
+        get_input = input
     
-    
-    while max_turns > num_turns:
-        user_message = input("Chat : ")
+    while True:
+        if max_turns is not None and num_turns >= max_turns:
+            break
+        user_message = get_input()
         if user_message.lower() in EXIT_KEYS: 
-            print("Exiting chatbot!")
             break
         
         messages = [{"role": "system", "content": persona}] + history + [{"role": "user", "content": user_message}]
 
-        response = retry_with_backoff(fn=lambda : client.chat.completions.create(model="gpt-4o",messages=history,stream=True))
+        response = retry_with_backoff(fn=lambda : client.chat.completions.create(model="gpt-4o",messages=messages,stream=True))
 
         # Iterate over the stream to extract text chunks
         system_prompt = ""
@@ -461,6 +462,7 @@ def run_assistant(
         total_cost += estimate_cost(user_message, system_prompt)['total_cost']
 
         num_turns += 1
+        history.append({"role": "system", "content": user_message})
         history.append({"role": "system", "content": system_prompt})
         history = history[-6:]
 
@@ -481,7 +483,11 @@ def batch_compare(prompts: list[str]) -> list[dict]:
     # TODO (bonus): lặp qua prompts, gọi compare_models, thêm key "prompt"
     # raise NotImplementedError("Implement batch_compare")
 
-    return [compare_models(i) for i in prompts]
+    results = []
+    for prompt in prompts:
+        comparison = compare_models(prompt)
+        results.append({**comparison, "prompt": prompt})
+    return results
 
 def truncate(value, max_length=40):
     """Cắt nội dung dài và loại bỏ xuống dòng."""
